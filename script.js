@@ -293,32 +293,62 @@ function updatePaletteNode(node) {
     const steps = parseInt(node.querySelector('.steps').value);
     const mode = node.querySelector('.mode').value;
     const visualOutput = node.querySelector('.visual-output');
+    const body = node.querySelector('.node-body');
 
-    // Generate Palette using culori
-    // We'll generate a scale from white to the base color to black, or just tints/shades
-    // Let's do a simple tint/shade scale: Lighter -> Base -> Darker
+    // Clear existing dynamic outputs
+    const existingOutputs = body.querySelectorAll('.dynamic-output');
+    existingOutputs.forEach(el => el.remove());
 
     const palette = [];
-    const interpolator = culori.interpolate(['white', baseColor, 'black'], { mode: mode });
+    let interpolator;
+
+    // Check if culori is loaded
+    if (typeof culori !== 'undefined') {
+        try {
+            interpolator = culori.interpolate(['white', baseColor, 'black'], { mode: mode });
+        } catch (e) {
+            console.error("Culori error:", e);
+            interpolator = () => baseColor; // Fallback
+        }
+    } else {
+        console.warn("Culori library not loaded. Using fallback.");
+        // Simple fallback: just repeat the color
+        interpolator = () => baseColor;
+    }
 
     visualOutput.innerHTML = '';
 
     for (let i = 0; i < steps; i++) {
-        // Map i to 0.1 - 0.9 range to avoid pure white/black
-        const t = 0.1 + (i / (steps - 1)) * 0.8;
-        const color = culori.formatHex(interpolator(t));
+        let color;
+        if (typeof culori !== 'undefined' && interpolator) {
+            const t = 0.1 + (i / (steps - 1)) * 0.8;
+            color = culori.formatHex(interpolator(t));
+        } else {
+            color = baseColor;
+        }
+
         palette.push(color);
 
+        // Visual Swatch
         const swatch = document.createElement('div');
         swatch.classList.add('swatch');
         swatch.style.backgroundColor = color;
         swatch.title = color;
         visualOutput.appendChild(swatch);
+
+        // Dynamic Output Socket
+        const socketRow = document.createElement('div');
+        socketRow.classList.add('socket-row', 'dynamic-output');
+        socketRow.innerHTML = `
+      <span>Step ${i + 1}</span>
+      <div class="socket output" title="color-${i}" data-value="${color}"></div>
+    `;
+        body.appendChild(socketRow);
     }
 
     node.dataset.value = JSON.stringify(palette);
 
-    // Propagate to connected nodes
+    // Propagate to connected nodes (Main Palette Output)
     triggerDownstream(node);
 }
 
@@ -327,6 +357,11 @@ function updateTypeScaleNode(node) {
     const ratio = parseFloat(node.querySelector('.ratio').value);
     const steps = parseInt(node.querySelector('.steps').value);
     const visualOutput = node.querySelector('.visual-output');
+    const body = node.querySelector('.node-body');
+
+    // Clear existing dynamic outputs
+    const existingOutputs = body.querySelectorAll('.dynamic-output');
+    existingOutputs.forEach(el => el.remove());
 
     const scale = [];
     visualOutput.innerHTML = '';
@@ -335,6 +370,7 @@ function updateTypeScaleNode(node) {
         const size = Math.round(baseSize * Math.pow(ratio, i));
         scale.push(size + 'px');
 
+        // Visual Preview
         const step = document.createElement('div');
         step.classList.add('type-step');
         step.innerHTML = `
@@ -342,6 +378,15 @@ function updateTypeScaleNode(node) {
       <span class="type-info">${size}px</span>
     `;
         visualOutput.appendChild(step);
+
+        // Dynamic Output Socket
+        const socketRow = document.createElement('div');
+        socketRow.classList.add('socket-row', 'dynamic-output');
+        socketRow.innerHTML = `
+      <span>Size ${i + 1}</span>
+      <div class="socket output" title="size-${i}" data-value="${size}px"></div>
+    `;
+        body.appendChild(socketRow);
     }
 
     node.dataset.value = JSON.stringify(scale);

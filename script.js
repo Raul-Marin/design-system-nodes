@@ -5,7 +5,6 @@ let nodes = [];
 let connections = [];
 let draggedNode = null;
 let dragOffset = { x: 0, y: 0 };
-let activeConnection = null;
 
 // Basic Node Factory
 function createNode(type, x, y) {
@@ -14,68 +13,40 @@ function createNode(type, x, y) {
     node.style.left = `${x}px`;
     node.style.top = `${y}px`;
     node.id = `node-${Date.now()}`;
-    node.dataset.type = type;
 
-    let title = '';
-    let content = '';
+    let title = type;
     let inputs = [];
     let outputs = [];
+    let content = '';
 
-    if (type === 'palette') {
-        title = 'Color Palette Generator';
-        outputs = ['palette'];
+    if (type === 'color') {
+        title = 'Color Input';
+        outputs = ['color'];
+        content = '<input type="color" value="#3b82f6">';
+    } else if (type === 'number') {
+        title = 'Number Input';
+        outputs = ['value'];
+        content = '<input type="number" value="16" style="width: 60px;"> <select style="width: 60px;"><option value="px">px</option><option value="rem">rem</option><option value="">none</option></select>';
+    } else if (type === 'font') {
+        title = 'Font Input';
+        outputs = ['font'];
+        content = '<select><option value="Inter, sans-serif">Inter</option><option value="JetBrains Mono, monospace">Mono</option><option value="serif">Serif</option></select>';
+    } else if (type === 'mix') {
+        title = 'Mix Colors';
+        inputs = ['A', 'B'];
+        outputs = ['result'];
+    } else if (type === 'output') {
+        title = 'Output Token';
+        inputs = ['value'];
         content = `
-      <div class="control-row">
-        <span>Base Color</span>
-        <input type="color" value="#3b82f6" class="base-color">
-      </div>
-      <div class="control-row">
-        <span>Steps</span>
-        <input type="number" value="5" min="3" max="10" class="steps">
-      </div>
-      <div class="control-row">
-        <span>Mode</span>
-        <select class="mode">
-          <option value="oklch">OKLCH</option>
-          <option value="rgb">RGB</option>
-          <option value="hsl">HSL</option>
-        </select>
-      </div>
-      <div class="visual-output color-swatch-row"></div>
-    `;
-    } else if (type === 'type-scale') {
-        title = 'Type Scale Generator';
-        outputs = ['scale'];
-        content = `
-      <div class="control-row">
-        <span>Base Size (px)</span>
-        <input type="number" value="16" class="base-size">
-      </div>
-      <div class="control-row">
-        <span>Ratio</span>
-        <select class="ratio">
-          <option value="1.25">1.25 (Major Third)</option>
-          <option value="1.414">1.414 (Augmented Fourth)</option>
-          <option value="1.5">1.5 (Perfect Fifth)</option>
-          <option value="1.618">1.618 (Golden Ratio)</option>
-        </select>
-      </div>
-      <div class="control-row">
-        <span>Steps</span>
-        <input type="number" value="5" min="3" max="8" class="steps">
-      </div>
-      <div class="visual-output type-scale-list"></div>
-    `;
-    } else if (type === 'export') {
-        title = 'Export to JSON';
-        inputs = ['data'];
-        content = `
-      <div class="control-row">
-        <span>Variable Name</span>
-        <input type="text" value="design-tokens" class="var-name">
-      </div>
-      <button class="export-btn">Download JSON</button>
-      <div class="json-preview" style="font-size: 0.7rem; color: #666; margin-top: 0.5rem; max-height: 100px; overflow: hidden;">Waiting for data...</div>
+      <select>
+        <option value="Primary Color">Primary Color</option>
+        <option value="Border Radius">Border Radius</option>
+        <option value="Border Width">Border Width</option>
+        <option value="Padding">Padding</option>
+        <option value="Gap">Gap</option>
+        <option value="Font Family">Font Family</option>
+      </select>
     `;
     }
 
@@ -90,30 +61,17 @@ function createNode(type, x, y) {
 
     // Drag Logic
     const header = node.querySelector('.node-header');
-    if (header) {
-        header.addEventListener('mousedown', (e) => {
-            draggedNode = node;
-            dragOffset.x = e.clientX - node.offsetLeft;
-            dragOffset.y = e.clientY - node.offsetTop;
-        });
-    }
-
-    // Export Logic
-    if (type === 'export') {
-        const btn = node.querySelector('.export-btn');
-        if (btn) btn.addEventListener('click', () => exportData(node));
-    }
+    header.addEventListener('mousedown', (e) => {
+        draggedNode = node;
+        dragOffset.x = e.clientX - node.offsetLeft;
+        dragOffset.y = e.clientY - node.offsetTop;
+    });
 
     nodeLayer.appendChild(node);
     nodes.push(node);
-
-    // Initial Process
-    setTimeout(() => {
-        processGraph();
-    }, 0); // Defer processing to ensure DOM is ready
 }
 
-// Canvas Drag & Drop
+// Canvas Drag & Drop (Creating Nodes)
 canvas.addEventListener('dragover', (e) => e.preventDefault());
 canvas.addEventListener('drop', (e) => {
     e.preventDefault();
@@ -126,43 +84,50 @@ canvas.addEventListener('drop', (e) => {
 // Sidebar Drag Start
 document.querySelectorAll('.node-template').forEach(t => {
     t.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('type', e.currentTarget.dataset.type);
+        e.dataTransfer.setData('type', e.target.dataset.type);
     });
 });
 
 // Connection Logic
+let activeConnection = null;
+
 function updateConnections() {
+    // Clear existing lines
     while (svgConnections.firstChild) {
         svgConnections.removeChild(svgConnections.firstChild);
     }
 
+    // Draw permanent connections
     connections.forEach(conn => {
         drawCurve(conn.outputNode, conn.outputSocket, conn.inputNode, conn.inputSocket);
     });
 
+    // Draw active drag connection
     if (activeConnection) {
         drawActiveCurve(activeConnection.startNode, activeConnection.startSocket, activeConnection.currentX, activeConnection.currentY);
     }
 }
 
 function drawCurve(nodeA, socketA, nodeB, socketB) {
+    // Calculate positions relative to canvas
     const rectA = nodeA.getBoundingClientRect();
     const rectB = nodeB.getBoundingClientRect();
     const canvasRect = canvas.getBoundingClientRect();
 
+    // Find socket elements
     const socketElA = nodeA.querySelector(`.socket.output[title="${socketA}"]`);
     const socketElB = nodeB.querySelector(`.socket.input[title="${socketB}"]`);
 
     if (!socketElA || !socketElB) return;
 
     const posA = {
-        x: rectA.left - canvasRect.left + socketElA.offsetLeft + 7,
-        y: rectA.top - canvasRect.top + socketElA.offsetTop + 7
+        x: rectA.left - canvasRect.left + socketElA.offsetLeft + 6,
+        y: rectA.top - canvasRect.top + socketElA.offsetTop + 6
     };
 
     const posB = {
-        x: rectB.left - canvasRect.left + socketElB.offsetLeft + 7,
-        y: rectB.top - canvasRect.top + socketElB.offsetTop + 7
+        x: rectB.left - canvasRect.left + socketElB.offsetLeft + 6,
+        y: rectB.top - canvasRect.top + socketElB.offsetTop + 6
     };
 
     createPath(posA.x, posA.y, posB.x, posB.y);
@@ -175,8 +140,8 @@ function drawActiveCurve(node, socket, x, y) {
 
     if (!socketEl) return;
 
-    const startX = rect.left - canvasRect.left + socketEl.offsetLeft + 7;
-    const startY = rect.top - canvasRect.top + socketEl.offsetTop + 7;
+    const startX = rect.left - canvasRect.left + socketEl.offsetLeft + 6;
+    const startY = rect.top - canvasRect.top + socketEl.offsetTop + 6;
 
     createPath(startX, startY, x, y);
 }
@@ -195,10 +160,10 @@ function createPath(x1, y1, x2, y2) {
     svgConnections.appendChild(path);
 }
 
-// Socket Event Listeners
+// Socket Event Listeners (Delegation)
 nodeLayer.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('socket') && e.target.classList.contains('output')) {
-        e.stopPropagation();
+        e.stopPropagation(); // Prevent node drag
         const node = e.target.closest('.node');
         const socketName = e.target.title;
 
@@ -216,12 +181,13 @@ nodeLayer.addEventListener('mouseup', (e) => {
         const node = e.target.closest('.node');
         const socketName = e.target.title;
 
-        // Replace existing connection
+        // Check if input is already connected and remove old connection (Replace Logic)
         const existingConnIndex = connections.findIndex(c => c.inputNode === node && c.inputSocket === socketName);
         if (existingConnIndex !== -1) {
             connections.splice(existingConnIndex, 1);
         }
 
+        // Create connection
         connections.push({
             outputNode: activeConnection.startNode,
             outputSocket: activeConnection.startSocket,
@@ -231,13 +197,14 @@ nodeLayer.addEventListener('mouseup', (e) => {
 
         activeConnection = null;
         updateConnections();
-        processGraph();
+        processGraph(); // Trigger update
     } else if (activeConnection) {
         activeConnection = null;
         updateConnections();
     }
 });
 
+// Right-click to disconnect
 nodeLayer.addEventListener('contextmenu', (e) => {
     if (e.target.classList.contains('socket') && e.target.classList.contains('input')) {
         e.preventDefault();
@@ -253,6 +220,7 @@ nodeLayer.addEventListener('contextmenu', (e) => {
     }
 });
 
+// Global Mouse Move (Dragging Nodes & Connections)
 document.addEventListener('mousemove', (e) => {
     const canvasRect = canvas.getBoundingClientRect();
 
@@ -277,174 +245,183 @@ document.addEventListener('mouseup', () => {
     }
 });
 
-// --- Logic Engine ---
-
+// Process Graph
 function processGraph() {
-    nodes.forEach(node => {
-        const type = node.dataset.type;
+    const outputNodes = nodes.filter(n => n.querySelector('.node-header').innerText === 'Output Token');
 
-        if (type === 'palette') {
-            updatePaletteNode(node);
-        } else if (type === 'type-scale') {
-            updateTypeScaleNode(node);
-        } else if (type === 'export') {
-            updateExportNode(node);
+    const tokenList = document.getElementById('token-list');
+    tokenList.innerHTML = '';
+
+    // Reset styles for active component to avoid stale values
+    resetComponentStyles();
+
+    outputNodes.forEach(outNode => {
+        const inputSocket = outNode.querySelector('.socket.input');
+        const source = findSource(outNode, 'value');
+
+        if (source) {
+            const value = calculateValue(source.node, source.socket);
+            const tokenType = outNode.querySelector('select').value;
+
+            applyToken(tokenType, value);
+
+            // Update Token List
+            const div = document.createElement('div');
+            div.style.padding = '0.5rem';
+            div.style.borderBottom = '1px solid #333';
+            div.style.fontSize = '0.8rem';
+            div.innerHTML = `<strong style="color:#3b82f6">${tokenType}</strong>: ${value}`;
+            tokenList.appendChild(div);
         }
     });
 }
 
-async function updatePaletteNode(node) {
-    const baseColor = node.querySelector('.base-color').value;
-    const steps = parseInt(node.querySelector('.steps').value);
-    const mode = node.querySelector('.mode').value;
-    const visualOutput = node.querySelector('.visual-output');
-    const body = node.querySelector('.node-body');
+function resetComponentStyles() {
+    const activeComponentId = document.getElementById('component-select').value;
+    const container = document.getElementById(`preview-${activeComponentId}`);
 
-    // Clear existing dynamic outputs
-    const existingOutputs = body.querySelectorAll('.dynamic-output');
-    existingOutputs.forEach(el => el.remove());
+    // Reset common properties to defaults
+    // Note: We only reset inline styles set by JS
+    container.style.borderRadius = '';
+    container.style.padding = '';
+    container.style.gap = '';
+    container.style.fontFamily = '';
 
-    const palette = [];
-    let interpolator;
-    let formatHex;
-
-    try {
-        const culori = await import('https://cdn.jsdelivr.net/npm/culori@3.0.0/bundled/culori.min.mjs');
-        interpolator = culori.interpolate(['white', baseColor, 'black'], { mode: mode });
-        formatHex = culori.formatHex;
-    } catch (e) {
-        console.error("Culori loading error:", e);
-        interpolator = () => baseColor;
-        formatHex = (c) => c;
+    const btn = container.querySelector('button');
+    if (btn) {
+        btn.style.backgroundColor = '';
+        btn.style.borderRadius = '';
     }
 
-    visualOutput.innerHTML = '';
+    const input = container.querySelector('input');
+    if (input) {
+        input.style.borderColor = '';
+        input.style.padding = '';
+    }
 
-    for (let i = 0; i < steps; i++) {
-        let color;
-        if (interpolator && formatHex) {
-            const t = 0.1 + (i / (steps - 1)) * 0.8;
-            color = formatHex(interpolator(t));
+    const title = container.querySelector('h2');
+    if (title) {
+        title.style.color = '';
+    }
+
+    const group = container.querySelector('.input-group');
+    if (group) {
+        group.style.gap = '';
+    }
+}
+
+function findSource(node, inputName) {
+    const conn = connections.find(c => c.inputNode === node && c.inputSocket === inputName);
+    if (conn) {
+        return { node: conn.outputNode, socket: conn.outputSocket };
+    }
+    return null;
+}
+
+function calculateValue(node, socketName) {
+    const type = node.querySelector('.node-header').innerText;
+
+    if (type === 'Color Input') {
+        return node.querySelector('input').value;
+    } else if (type === 'Number Input') {
+        const val = node.querySelector('input').value;
+        const unit = node.querySelectorAll('select')[0].value;
+        return val + unit;
+    } else if (type === 'Font Input') {
+        return node.querySelector('select').value;
+    } else if (type === 'Mix Colors') {
+        const sourceA = findSource(node, 'A');
+        const sourceB = findSource(node, 'B');
+
+        const colorA = sourceA ? calculateValue(sourceA.node, sourceA.socket) : '#000000';
+        const colorB = sourceB ? calculateValue(sourceB.node, sourceB.socket) : '#ffffff';
+
+        return mixColors(colorA, colorB, 0.5);
+    }
+
+    return null;
+}
+
+function applyToken(type, value) {
+    const activeComponentId = document.getElementById('component-select').value;
+    const container = document.getElementById(`preview-${activeComponentId}`);
+
+    // Reset styles first? No, we want cumulative updates from multiple nodes.
+    // But we need to target specific elements based on component type.
+
+    let target = container; // Default to container (e.g. Card)
+    if (activeComponentId === 'button') target = container.querySelector('button');
+    if (activeComponentId === 'input') target = container.querySelector('input');
+
+    // Special case for Card inner elements
+    const cardBtn = container.querySelector('button');
+    const cardTitle = container.querySelector('h2');
+
+    if (type === 'Primary Color') {
+        if (activeComponentId === 'card') {
+            cardBtn.style.backgroundColor = value;
+            cardTitle.style.color = value;
+        } else if (activeComponentId === 'button') {
+            target.style.backgroundColor = value;
+        } else if (activeComponentId === 'input') {
+            target.style.borderColor = value;
+        }
+    } else if (type === 'Border Radius') {
+        target.style.borderRadius = value;
+        if (activeComponentId === 'card') cardBtn.style.borderRadius = value;
+    } else if (type === 'Border Width') {
+        target.style.borderWidth = value;
+        target.style.borderStyle = 'solid';
+    } else if (type === 'Padding') {
+        target.style.padding = value;
+    } else if (type === 'Gap') {
+        if (activeComponentId === 'input') {
+            container.querySelector('.input-group').style.gap = value;
         } else {
-            color = baseColor;
+            target.style.gap = value;
         }
-
-        palette.push(color);
-
-        // Visual Swatch
-        const swatch = document.createElement('div');
-        swatch.classList.add('swatch');
-        swatch.style.backgroundColor = color;
-        swatch.title = color;
-        visualOutput.appendChild(swatch);
-
-        // Dynamic Output Socket
-        const socketRow = document.createElement('div');
-        socketRow.classList.add('socket-row', 'dynamic-output');
-        socketRow.innerHTML = `
-      <span>Step ${i + 1}</span>
-      <div class="socket output" title="color-${i}" data-value="${color}"></div>
-    `;
-        body.appendChild(socketRow);
-    }
-
-    node.dataset.value = JSON.stringify(palette);
-
-    // Propagate to connected nodes (Main Palette Output)
-    triggerDownstream(node);
-}
-
-function updateTypeScaleNode(node) {
-    const baseSize = parseInt(node.querySelector('.base-size').value);
-    const ratio = parseFloat(node.querySelector('.ratio').value);
-    const steps = parseInt(node.querySelector('.steps').value);
-    const visualOutput = node.querySelector('.visual-output');
-    const body = node.querySelector('.node-body');
-
-    // Clear existing dynamic outputs
-    const existingOutputs = body.querySelectorAll('.dynamic-output');
-    existingOutputs.forEach(el => el.remove());
-
-    const scale = [];
-    visualOutput.innerHTML = '';
-
-    for (let i = 0; i < steps; i++) {
-        const size = Math.round(baseSize * Math.pow(ratio, i));
-        scale.push(size + 'px');
-
-        // Visual Preview
-        const step = document.createElement('div');
-        step.classList.add('type-step');
-        step.innerHTML = `
-          <span class="type-preview" style="font-size: ${Math.min(size, 24)}px">Ag</span>
-          <span class="type-info">${size}px</span>
-        `;
-        visualOutput.appendChild(step);
-
-        // Dynamic Output Socket
-        const socketRow = document.createElement('div');
-        socketRow.classList.add('socket-row', 'dynamic-output');
-        socketRow.innerHTML = `
-          <span>Size ${i + 1}</span>
-          <div class="socket output" title="size-${i}" data-value="${size}px"></div>
-        `;
-        body.appendChild(socketRow);
-    }
-
-    node.dataset.value = JSON.stringify(scale);
-    triggerDownstream(node);
-}
-
-function updateExportNode(node) {
-    const inputConn = connections.find(c => c.inputNode === node);
-    const preview = node.querySelector('.json-preview');
-
-    if (inputConn) {
-        const sourceNode = inputConn.outputNode;
-        const data = JSON.parse(sourceNode.dataset.value || '[]');
-        preview.innerText = JSON.stringify(data, null, 2);
-        node.dataset.exportData = JSON.stringify(data);
-    } else {
-        preview.innerText = "No input connected";
-        node.dataset.exportData = '';
-    }
-}
-
-function triggerDownstream(node) {
-    // Find nodes connected to this node's output
-    const downstreamConns = connections.filter(c => c.outputNode === node);
-    downstreamConns.forEach(c => {
-        if (c.inputNode.dataset.type === 'export') {
-            updateExportNode(c.inputNode);
+    } else if (type === 'Font Family') {
+        target.style.fontFamily = value;
+        if (activeComponentId === 'card') {
+            container.style.fontFamily = value;
         }
-    });
+    }
 }
 
-function exportData(node) {
-    const dataStr = node.dataset.exportData;
-    if (!dataStr) return;
+// Component Selector Logic
+document.getElementById('component-select').addEventListener('change', (e) => {
+    document.querySelectorAll('.preview-component').forEach(el => el.classList.remove('active'));
+    document.getElementById(`preview-${e.target.value}`).classList.add('active');
+    processGraph(); // Re-apply tokens to new component
+});
 
-    const name = node.querySelector('.var-name').value;
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+// Simple Color Mixer
+function mixColors(hex1, hex2, weight) {
+    function d2h(d) { return d.toString(16); }
+    function h2d(h) { return parseInt(h, 16); }
 
-    const link = document.createElement('a');
-    link.setAttribute('href', dataUri);
-    link.setAttribute('download', name + '.json');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    weight = (typeof (weight) !== 'undefined') ? weight : 0.5;
+
+    let color = "#";
+
+    for (let i = 1; i <= 6; i += 2) {
+        let v1 = h2d(hex1.substr(i, 2));
+        let v2 = h2d(hex2.substr(i, 2));
+        let val = d2h(Math.floor(v2 + (v1 - v2) * weight));
+        while (val.length < 2) { val = '0' + val; }
+        color += val;
+    }
+
+    return color;
 }
 
-// Event Listeners for Controls
+// Trigger process on input change
 nodeLayer.addEventListener('input', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
-        const node = e.target.closest('.node');
-        if (node.dataset.type === 'palette') updatePaletteNode(node);
-        if (node.dataset.type === 'type-scale') updateTypeScaleNode(node);
+        processGraph();
     }
 });
 
 // Initial Nodes
-createNode('palette', 50, 50);
-createNode('type-scale', 50, 350);
-createNode('export', 400, 200);
+createNode('color', 50, 50);
+createNode('output', 400, 100);

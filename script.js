@@ -26,7 +26,11 @@ function createNode(type, x, y) {
     } else if (type === 'number') {
         title = 'Number Input';
         outputs = ['value'];
-        content = '<input type="range" min="0" max="100" value="16">';
+        content = '<input type="number" value="16" style="width: 60px;"> <select style="width: 60px;"><option value="px">px</option><option value="rem">rem</option><option value="">none</option></select>';
+    } else if (type === 'font') {
+        title = 'Font Input';
+        outputs = ['font'];
+        content = '<select><option value="Inter, sans-serif">Inter</option><option value="JetBrains Mono, monospace">Mono</option><option value="serif">Serif</option></select>';
     } else if (type === 'mix') {
         title = 'Mix Colors';
         inputs = ['A', 'B'];
@@ -34,7 +38,16 @@ function createNode(type, x, y) {
     } else if (type === 'output') {
         title = 'Output Token';
         inputs = ['value'];
-        content = '<select><option>Primary Color</option><option>Border Radius</option></select>';
+        content = `
+      <select>
+        <option value="Primary Color">Primary Color</option>
+        <option value="Border Radius">Border Radius</option>
+        <option value="Border Width">Border Width</option>
+        <option value="Padding">Padding</option>
+        <option value="Gap">Gap</option>
+        <option value="Font Family">Font Family</option>
+      </select>
+    `;
     }
 
     node.innerHTML = `
@@ -252,7 +265,11 @@ function calculateValue(node, socketName) {
     if (type === 'Color Input') {
         return node.querySelector('input').value;
     } else if (type === 'Number Input') {
-        return node.querySelector('input').value + 'px';
+        const val = node.querySelector('input').value;
+        const unit = node.querySelectorAll('select')[0].value;
+        return val + unit;
+    } else if (type === 'Font Input') {
+        return node.querySelector('select').value;
     } else if (type === 'Mix Colors') {
         const sourceA = findSource(node, 'A');
         const sourceB = findSource(node, 'B');
@@ -267,17 +284,57 @@ function calculateValue(node, socketName) {
 }
 
 function applyToken(type, value) {
-    const card = document.getElementById('preview-card');
-    const btn = card.querySelector('button');
+    const activeComponentId = document.getElementById('component-select').value;
+    const container = document.getElementById(`preview-${activeComponentId}`);
+
+    // Reset styles first? No, we want cumulative updates from multiple nodes.
+    // But we need to target specific elements based on component type.
+
+    let target = container; // Default to container (e.g. Card)
+    if (activeComponentId === 'button') target = container.querySelector('button');
+    if (activeComponentId === 'input') target = container.querySelector('input');
+
+    // Special case for Card inner elements
+    const cardBtn = container.querySelector('button');
+    const cardTitle = container.querySelector('h2');
 
     if (type === 'Primary Color') {
-        btn.style.backgroundColor = value;
-        card.querySelector('h2').style.color = value;
+        if (activeComponentId === 'card') {
+            cardBtn.style.backgroundColor = value;
+            cardTitle.style.color = value;
+        } else if (activeComponentId === 'button') {
+            target.style.backgroundColor = value;
+        } else if (activeComponentId === 'input') {
+            target.style.borderColor = value;
+        }
     } else if (type === 'Border Radius') {
-        card.style.borderRadius = value;
-        btn.style.borderRadius = value;
+        target.style.borderRadius = value;
+        if (activeComponentId === 'card') cardBtn.style.borderRadius = value;
+    } else if (type === 'Border Width') {
+        target.style.borderWidth = value;
+        target.style.borderStyle = 'solid';
+    } else if (type === 'Padding') {
+        target.style.padding = value;
+    } else if (type === 'Gap') {
+        if (activeComponentId === 'input') {
+            container.querySelector('.input-group').style.gap = value;
+        } else {
+            target.style.gap = value;
+        }
+    } else if (type === 'Font Family') {
+        target.style.fontFamily = value;
+        if (activeComponentId === 'card') {
+            container.style.fontFamily = value;
+        }
     }
 }
+
+// Component Selector Logic
+document.getElementById('component-select').addEventListener('change', (e) => {
+    document.querySelectorAll('.preview-component').forEach(el => el.classList.remove('active'));
+    document.getElementById(`preview-${e.target.value}`).classList.add('active');
+    processGraph(); // Re-apply tokens to new component
+});
 
 // Simple Color Mixer
 function mixColors(hex1, hex2, weight) {

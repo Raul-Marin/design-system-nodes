@@ -140,6 +140,47 @@ body {
     z-index: 10;
 }
 
+/* Preview Components */
+.preview-component {
+    display: none;
+    background: #fff;
+    color: #000;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+    border: 1px solid #e5e5e5;
+}
+
+.preview-component.active {
+    display: block;
+}
+
+/* Button Preview */
+.demo-btn {
+    padding: 0.75rem 1.5rem;
+    background: #000;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+/* Input Preview */
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.demo-input {
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
 .preview-card {
     background: #fff;
     color: #000;

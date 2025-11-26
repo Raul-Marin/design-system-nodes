@@ -17,6 +17,7 @@
         <h3>Nodes</h3>
         <div class="node-template" draggable="true" data-type="color">Color Input</div>
         <div class="node-template" draggable="true" data-type="number">Number Input</div>
+        <div class="node-template" draggable="true" data-type="font">Font Input</div>
         <div class="node-template" draggable="true" data-type="mix">Mix Colors</div>
         <div class="node-template" draggable="true" data-type="output">Output Token</div>
     </aside>
@@ -32,10 +33,37 @@
     <!-- Preview Panel -->
     <aside id="preview-panel">
         <h3>Live Preview</h3>
-        <div id="preview-card" class="preview-card">
-            <h2>Card Title</h2>
-            <p>This is a preview of the generated design tokens.</p>
-            <button>Action</button>
+
+        <div class="control-group" style="margin-bottom: 1rem;">
+            <label for="component-select" style="font-size: 0.8rem; color: #888;">Component:</label>
+            <select id="component-select"
+                style="width: 100%; padding: 0.5rem; background: #333; color: #fff; border: 1px solid #444; border-radius: 4px;">
+                <option value="card">Card</option>
+                <option value="button">Button</option>
+                <option value="input">Input Field</option>
+            </select>
+        </div>
+
+        <div id="preview-container" class="preview-container">
+            <!-- Card Preview -->
+            <div id="preview-card" class="preview-component active">
+                <h2>Card Title</h2>
+                <p>This is a preview of the generated design tokens.</p>
+                <button>Action</button>
+            </div>
+
+            <!-- Button Preview -->
+            <div id="preview-button" class="preview-component">
+                <button class="demo-btn">Click Me</button>
+            </div>
+
+            <!-- Input Preview -->
+            <div id="preview-input" class="preview-component">
+                <div class="input-group">
+                    <label>Label</label>
+                    <input type="text" placeholder="Type something..." class="demo-input">
+                </div>
+            </div>
         </div>
 
         <div id="token-list">

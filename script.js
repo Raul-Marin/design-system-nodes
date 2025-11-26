@@ -230,6 +230,9 @@ function processGraph() {
     const tokenList = document.getElementById('token-list');
     tokenList.innerHTML = '';
 
+    // Reset styles for active component to avoid stale values
+    resetComponentStyles();
+
     outputNodes.forEach(outNode => {
         const inputSocket = outNode.querySelector('.socket.input');
         const source = findSource(outNode, 'value');
@@ -249,6 +252,40 @@ function processGraph() {
             tokenList.appendChild(div);
         }
     });
+}
+
+function resetComponentStyles() {
+    const activeComponentId = document.getElementById('component-select').value;
+    const container = document.getElementById(`preview-${activeComponentId}`);
+
+    // Reset common properties to defaults
+    // Note: We only reset inline styles set by JS
+    container.style.borderRadius = '';
+    container.style.padding = '';
+    container.style.gap = '';
+    container.style.fontFamily = '';
+
+    const btn = container.querySelector('button');
+    if (btn) {
+        btn.style.backgroundColor = '';
+        btn.style.borderRadius = '';
+    }
+
+    const input = container.querySelector('input');
+    if (input) {
+        input.style.borderColor = '';
+        input.style.padding = '';
+    }
+
+    const title = container.querySelector('h2');
+    if (title) {
+        title.style.color = '';
+    }
+
+    const group = container.querySelector('.input-group');
+    if (group) {
+        group.style.gap = '';
+    }
 }
 
 function findSource(node, inputName) {

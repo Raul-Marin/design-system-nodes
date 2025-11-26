@@ -90,22 +90,27 @@ function createNode(type, x, y) {
 
     // Drag Logic
     const header = node.querySelector('.node-header');
-    header.addEventListener('mousedown', (e) => {
-        draggedNode = node;
-        dragOffset.x = e.clientX - node.offsetLeft;
-        dragOffset.y = e.clientY - node.offsetTop;
-    });
+    if (header) {
+        header.addEventListener('mousedown', (e) => {
+            draggedNode = node;
+            dragOffset.x = e.clientX - node.offsetLeft;
+            dragOffset.y = e.clientY - node.offsetTop;
+        });
+    }
 
     // Export Logic
     if (type === 'export') {
-        node.querySelector('.export-btn').addEventListener('click', () => exportData(node));
+        const btn = node.querySelector('.export-btn');
+        if (btn) btn.addEventListener('click', () => exportData(node));
     }
 
     nodeLayer.appendChild(node);
     nodes.push(node);
 
     // Initial Process
-    processGraph();
+    setTimeout(() => {
+        processGraph();
+    }, 0); // Defer processing to ensure DOM is ready
 }
 
 // Canvas Drag & Drop
@@ -121,7 +126,7 @@ canvas.addEventListener('drop', (e) => {
 // Sidebar Drag Start
 document.querySelectorAll('.node-template').forEach(t => {
     t.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('type', e.target.dataset.type);
+        e.dataTransfer.setData('type', e.currentTarget.dataset.type);
     });
 });
 
@@ -288,7 +293,7 @@ function processGraph() {
     });
 }
 
-function updatePaletteNode(node) {
+async function updatePaletteNode(node) {
     const baseColor = node.querySelector('.base-color').value;
     const steps = parseInt(node.querySelector('.steps').value);
     const mode = node.querySelector('.mode').value;
@@ -301,28 +306,25 @@ function updatePaletteNode(node) {
 
     const palette = [];
     let interpolator;
+    let formatHex;
 
-    // Check if culori is loaded
-    if (typeof culori !== 'undefined') {
-        try {
-            interpolator = culori.interpolate(['white', baseColor, 'black'], { mode: mode });
-        } catch (e) {
-            console.error("Culori error:", e);
-            interpolator = () => baseColor; // Fallback
-        }
-    } else {
-        console.warn("Culori library not loaded. Using fallback.");
-        // Simple fallback: just repeat the color
+    try {
+        const culori = await import('https://cdn.jsdelivr.net/npm/culori@3.0.0/bundled/culori.min.mjs');
+        interpolator = culori.interpolate(['white', baseColor, 'black'], { mode: mode });
+        formatHex = culori.formatHex;
+    } catch (e) {
+        console.error("Culori loading error:", e);
         interpolator = () => baseColor;
+        formatHex = (c) => c;
     }
 
     visualOutput.innerHTML = '';
 
     for (let i = 0; i < steps; i++) {
         let color;
-        if (typeof culori !== 'undefined' && interpolator) {
+        if (interpolator && formatHex) {
             const t = 0.1 + (i / (steps - 1)) * 0.8;
-            color = culori.formatHex(interpolator(t));
+            color = formatHex(interpolator(t));
         } else {
             color = baseColor;
         }
@@ -374,18 +376,18 @@ function updateTypeScaleNode(node) {
         const step = document.createElement('div');
         step.classList.add('type-step');
         step.innerHTML = `
-      <span class="type-preview" style="font-size: ${Math.min(size, 24)}px">Ag</span>
-      <span class="type-info">${size}px</span>
-    `;
+          <span class="type-preview" style="font-size: ${Math.min(size, 24)}px">Ag</span>
+          <span class="type-info">${size}px</span>
+        `;
         visualOutput.appendChild(step);
 
         // Dynamic Output Socket
         const socketRow = document.createElement('div');
         socketRow.classList.add('socket-row', 'dynamic-output');
         socketRow.innerHTML = `
-      <span>Size ${i + 1}</span>
-      <div class="socket output" title="size-${i}" data-value="${size}px"></div>
-    `;
+          <span>Size ${i + 1}</span>
+          <div class="socket output" title="size-${i}" data-value="${size}px"></div>
+        `;
         body.appendChild(socketRow);
     }
 

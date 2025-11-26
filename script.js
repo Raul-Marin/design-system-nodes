@@ -181,6 +181,12 @@ nodeLayer.addEventListener('mouseup', (e) => {
         const node = e.target.closest('.node');
         const socketName = e.target.title;
 
+        // Check if input is already connected and remove old connection (Replace Logic)
+        const existingConnIndex = connections.findIndex(c => c.inputNode === node && c.inputSocket === socketName);
+        if (existingConnIndex !== -1) {
+            connections.splice(existingConnIndex, 1);
+        }
+
         // Create connection
         connections.push({
             outputNode: activeConnection.startNode,
@@ -195,6 +201,22 @@ nodeLayer.addEventListener('mouseup', (e) => {
     } else if (activeConnection) {
         activeConnection = null;
         updateConnections();
+    }
+});
+
+// Right-click to disconnect
+nodeLayer.addEventListener('contextmenu', (e) => {
+    if (e.target.classList.contains('socket') && e.target.classList.contains('input')) {
+        e.preventDefault();
+        const node = e.target.closest('.node');
+        const socketName = e.target.title;
+
+        const existingConnIndex = connections.findIndex(c => c.inputNode === node && c.inputSocket === socketName);
+        if (existingConnIndex !== -1) {
+            connections.splice(existingConnIndex, 1);
+            updateConnections();
+            processGraph();
+        }
     }
 });
 

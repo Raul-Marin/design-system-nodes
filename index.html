@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node-Based Design System</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- Sidebar: Node Library -->
+    <aside id="sidebar">
+        <h3>Nodes</h3>
+        <div class="node-template" draggable="true" data-type="color">Color Input</div>
+        <div class="node-template" draggable="true" data-type="number">Number Input</div>
+        <div class="node-template" draggable="true" data-type="mix">Mix Colors</div>
+        <div class="node-template" draggable="true" data-type="output">Output Token</div>
+    </aside>
+
+    <!-- Main Canvas -->
+    <main id="canvas-container">
+        <svg id="connections"></svg>
+        <div id="node-layer">
+            <!-- Nodes will be added here -->
+        </div>
+    </main>
+
+    <!-- Preview Panel -->
+    <aside id="preview-panel">
+        <h3>Live Preview</h3>
+        <div id="preview-card" class="preview-card">
+            <h2>Card Title</h2>
+            <p>This is a preview of the generated design tokens.</p>
+            <button>Action</button>
+        </div>
+
+        <div id="token-list">
+            <!-- Live token values -->
+        </div>
+
+        <footer style="margin-top: auto; padding-top: 1rem; font-size: 0.7rem; color: #666; text-align: center;">
+            Proyecto experimental de Raul Marin para probar las evoluciones de los Design Systems y la IA Generativa.
+        </footer>
+    </aside>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
